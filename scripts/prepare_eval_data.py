@@ -6,9 +6,8 @@ Usage
     python scripts/prepare_eval_data.py winoground \\
         --output-dir data/eval/winoground
 
-    # SugarCrepe (needs MS-COCO val2017 downloaded separately)
+    # SugarCrepe — images are embedded in HF, no COCO download needed
     python scripts/prepare_eval_data.py sugarcrepe \\
-        --coco-val-dir /path/to/coco/val2017 \\
         --output-dir data/eval/sugarcrepe \\
         [--subsets replace_obj swap_att]   # default = all 7
 """
@@ -43,8 +42,10 @@ def main():
 
     p_s = sub.add_parser("sugarcrepe")
     p_s.add_argument("--output-dir", required=True, type=Path)
-    p_s.add_argument("--coco-val-dir", required=True, type=Path)
-    p_s.add_argument("--hf-repo", default="HuggingFaceM4/SugarCrepe")
+    p_s.add_argument("--coco-val-dir", default=None, type=Path,
+                     help="Unused for standard HF repos (images are embedded); kept for custom mirrors")
+    p_s.add_argument("--hf-repo", default=None,
+                     help="Custom HF mirror; default uses HuggingFaceM4/SugarCrepe_{subset} per subset")
     p_s.add_argument("--hf-token", default=os.environ.get("HF_TOKEN"))
     p_s.add_argument("--cache-dir", default=None)
     p_s.add_argument("--subsets", nargs="+", default=list(SUGARCREPE_SUBSETS))
@@ -63,9 +64,6 @@ def main():
         print(f"wrote {json_path}  (images in {image_dir})")
 
     elif args.cmd == "sugarcrepe":
-        if not args.coco_val_dir.exists():
-            print(f"error: --coco-val-dir does not exist: {args.coco_val_dir}", file=sys.stderr)
-            sys.exit(2)
         json_path = load_sugarcrepe(
             output_dir=args.output_dir,
             coco_val_dir=args.coco_val_dir,
@@ -74,7 +72,7 @@ def main():
             cache_dir=args.cache_dir,
             subsets=args.subsets,
         )
-        print(f"wrote {json_path}  (image_root: {args.coco_val_dir})")
+        print(f"wrote {json_path}  (image_root: {args.output_dir}/images)")
 
 
 if __name__ == "__main__":
