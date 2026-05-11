@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Training / eval outputs
+outputs/
+runs/
+wandb/
+logs/
+*.log
+
+# Model weights and checkpoints (saved separately, never tracked in git)
+*.pt
+*.bin
+*.safetensors
+*.ckpt
+
+# Eval data (large; user-provided per docs/data_access_checklist.md)
+data/eval/
+data/train/
+
+# Decontamination build artifacts
+decontamination_index.json
+excluded*.tsv
+
+# Local config (may contain HF tokens or other secrets)
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Coverage / profiling
+.coverage
+htmlcov/
+*.prof
+
+# Jupyter
+.ipynb_checkpoints/

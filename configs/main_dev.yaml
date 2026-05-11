@@ -1,0 +1,34 @@
+# Tier-0 (engineering / debugging): Qwen2.5-0.5B.
+#
+# Use only for code validation, gate-collapse diagnostics, and rapid
+# overfit-on-tiny-set sanity checks. NEVER report numbers from this tier
+# in the paper. Trains in hours rather than days.
+#
+# Note: 0.5B has 24 layers (vs 28 in 1.5B/7B), so injection_layer is 12.
+# This is the only config-level deviation from the other tiers.
+name: main_K2_dev_0_5B
+
+encoder:
+  arch: convnextv2_base
+  pretrained: imagenet22k
+  injection_stages: [2, 3]
+  freeze_stages: [0, 1]
+
+llm:
+  arch: Qwen/Qwen2.5-0.5B-Instruct
+  injection_layer: 12            # 24 layers; middle
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+recurrence:
+  num_iterations: 2
+  aux_iter1_loss_weight: 0.3
+
+memory:
+  num_tokens: 32
+
+control_overrides:
+  base: false

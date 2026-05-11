@@ -1,0 +1,44 @@
+# Specificity control suite (§4 of SPEC_v1.md). Each entry is a delta against
+# configs/main.yaml. Loader applies these on top of the main config.
+
+C1_flop_matched_feedforward:
+  recurrence: { num_iterations: 1 }
+  encoder: { extra_depth_per_stage: 2 }   # adds depth to match K=2 FLOPs
+  notes: "Same FLOPs as K=2, no recurrence. Compute-confound control."
+
+C2_recurrence_no_llm:
+  use_llm_kv: false
+  notes: "K=2 loop; KV come from lateral CNN features instead of LLM hidden states."
+
+C3_llm_no_recurrence:
+  recurrence: { num_iterations: 1 }
+  notes: "Single-iteration LLM-conditioned cross-attention; isolates the loop."
+
+C4_random_llm_keys:
+  randomize_llm_kv: true
+  random_kv_seed: 0
+  notes: "Frozen random projection of LLM hidden states. Tests whether language content matters."
+
+C5_shuffled_caption:
+  eval_only: true
+  caption_shuffle: true
+  notes: "Eval-time control on NSD: provide wrong captions; predict ROI-specific degradation."
+
+C6_iteration_scrambling:
+  eval_only: true
+  scramble_iterations: true
+  notes: "Eval-time: swap iter-1 and iter-2 features into encoding regression."
+
+C7_memory_lesion:
+  eval_only: true
+  lesion_memory: true
+  notes: "Eval-time: zero out persistent tokens."
+
+C8_K_sweep:
+  recurrence: { num_iterations: [1, 2, 3, 4] }
+  notes: "Train separate models at each K; expect diminishing returns by K=2-3."
+
+C9_ensembling_baseline:
+  recurrence: { num_iterations: 1 }
+  inference: { stochastic_passes: 2, dropout_at_inference: 0.1 }
+  notes: "Two stochastic K=1 passes averaged. Rules out implicit ensembling."

@@ -1,0 +1,40 @@
+# Tier-2 (publication): Qwen2.5-7B.
+#
+# Used only for headline runs:
+#   - Main model M
+#   - C1 (FLOP-matched feedforward) for the compute-confound contrast
+#   - C2 (recurrence-without-LLM) for the language-conditioning contrast
+#   - H1 Winoground / SugarCrepe / ARO numbers
+#
+# All other controls (C3, C4, C5, C6-C9) and all of H2/H3/H4/H5 stay on
+# the 1.5B tier per SPEC_v1.md to keep the 4-8x A100 / 9-week budget
+# realistic. The paper frames it explicitly: "All ablations and control
+# models are trained at 1.5B for compute parity across the 9-control
+# matrix; the main model + the two strongest controls are additionally
+# trained at 7B to verify scale invariance."
+name: main_K2_pub_7B
+
+encoder:
+  arch: convnextv2_base
+  pretrained: imagenet22k
+  injection_stages: [2, 3]
+  freeze_stages: [0, 1]
+
+llm:
+  arch: Qwen/Qwen2.5-7B-Instruct
+  injection_layer: 14            # 28 layers; middle
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+recurrence:
+  num_iterations: 2
+  aux_iter1_loss_weight: 0.3
+
+memory:
+  num_tokens: 32
+
+control_overrides:
+  base: false

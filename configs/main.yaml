@@ -1,0 +1,39 @@
+# Tier-1 (architecture iteration + most pre-registered controls): Qwen2.5-1.5B.
+#
+# This is the default config. Used for:
+#   - all C1-C9 control models in the specificity suite (PREREGISTRATION.md §1)
+#   - H2 (NSD variance partitioning), H3 (MEG temporal gen), H4 (caption
+#     specificity), H5 (RT specificity) — these are intra-model contrasts
+#     where 1.5B has enough capability to drive meaningful gate dynamics
+#     without being budget-prohibitive across 9 controls
+#   - architecture iteration (injection sites, K-sweep, replay ratio)
+#
+# H1 Winoground numbers will likely need the publication tier (Qwen2.5-7B)
+# because at 1.5B the baseline group-score is ~25-30% and the recurrence-
+# attributable headroom is only 2-3% absolute (high noise risk).
+name: main_K2_1_5B
+
+encoder:
+  arch: convnextv2_base
+  pretrained: imagenet22k
+  injection_stages: [2, 3]
+  freeze_stages: [0, 1]
+
+llm:
+  arch: Qwen/Qwen2.5-1.5B-Instruct
+  injection_layer: 14            # 28 layers; middle
+  lora:
+    rank: 16
+    alpha: 32
+    dropout: 0.05
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj]
+
+recurrence:
+  num_iterations: 2
+  aux_iter1_loss_weight: 0.3
+
+memory:
+  num_tokens: 32
+
+control_overrides:
+  base: false
