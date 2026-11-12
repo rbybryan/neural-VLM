@@ -1,39 +1,39 @@
-# Research status and limitations
+# Current status
 
-## Implemented and exercised by the synthetic CPU suite
+The recurrent model and its training/evaluation code are implemented. My next step
+is to run a matched baseline and recurrent model on real data.
 
-- Recurrent model construction with random ConvNeXt-V2-atto and a small Qwen2 configuration.
-- Single-pass/recurrent agreement at zero gate initialization, finite loss, and backpropagation.
-- Synthetic conversation loading, perceptual-hash filtering, and collation.
-- A short optimizer run that updates adapter gates and saves trainable parameters.
-- Synthetic scoring, control sweeps, probe interfaces, and dataset-manifest conversion.
+## What runs now
 
-The checks use random weights and generated inputs. Their successful execution shows
-that these paths run and selected invariants hold; it does not validate scientific hypotheses.
-The training smoke check prints early/late losses but does not establish convergence.
+The CPU suite uses ConvNeXt-V2-atto and a small Qwen2 model, both randomly initialized.
+All seven checks pass. They cover:
 
-## Implemented but requiring separate validation
+- Agreement between the single-pass and recurrent paths at zero gate initialization.
+- Finite loss and backpropagation through the model.
+- Synthetic conversations, batching, and perceptual-hash filtering.
+- A ten-step training run that updates the gates and saves a checkpoint.
+- Scoring, control sweeps, probe behavior, and dataset-manifest conversion.
 
-Real-weight loading and LoRA integration, distributed/GPU training, real dataset evaluation,
-and the neural and behavioral analysis modules require their own environment, data, and
-validation. A function or script being present is not evidence that a full experiment succeeded.
-The CPU suite does not test all these paths.
+This gives me a working starting point for the experiments. The short training run
+prints a loss curve, but it isn't a convergence study. The synthetic evaluation
+scores aren't benchmark results.
 
-## Research results not claimed by this release
+## What still needs testing
 
-- Improved Winoground, SugarCrepe, or other benchmark performance.
-- Successful H1–H5 confirmatory tests or a trained recurrent-model release.
-- Demonstrated biological plausibility, brain alignment, or human reaction-time prediction.
-- A general advantage from recurrence, language feedback, or persistent memory.
+Real-weight loading, LoRA integration, GPU/distributed training, and the neural and
+behavioral analyses need separate validation. The CPU suite doesn't cover those paths.
+I don't yet have results showing that recurrence improves compositional reasoning,
+brain alignment, or reaction-time prediction.
 
-The plans in `PREREGISTRATION.md` and `SPEC_v1.md` are repository documents.
-No external registry record is supplied. Preserve the original plans and record future
-changes as dated amendments rather than rewriting their historical hypotheses.
-H3 follows `docs/preregistration_amendment_01.md` (THINGS-EEG2).
+For the first real-data comparison, I want to:
 
-## Next research milestone
+1. Establish a single-pass baseline and verify the data splits and decontamination.
+2. Train the recurrent model under the same setup, recording the config and seeds.
+3. Compare the controls to separate the effects of recurrence, language feedback,
+   and memory, with uncertainty estimates for the differences.
 
-Run a documented real-data baseline and matched recurrent/control comparison, publish
-the configuration and split/decontamination record, and report uncertainty and failed
-hypotheses alongside positive findings. Record the exact commit, seed, hardware, software
-environment, and data/model versions. Keep tuning data separate from confirmatory evaluation.
+The [hypotheses](../PREREGISTRATION.md) and [specification](../SPEC_v1.md) are planning
+records in this repository; there is no external preregistration record linked here.
+Changes to the plan go in dated amendments. The existing
+[H3 amendment](preregistration_amendment_01.md) switches the neural dataset from
+THINGS-MEG to THINGS-EEG2.
