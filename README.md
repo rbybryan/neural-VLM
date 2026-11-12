@@ -1,182 +1,124 @@
-# VLM-custom
+# neural-VLM: language-conditioned recurrent vision
 
-Language-conditioned recurrent modulation in a VLM. See `SPEC_v1.md` for the
-research plan, `PREREGISTRATION.md` for the locked confirmatory analyses,
-`model/` for the architecture skeleton, and `analysis/` for the brain- and
-behavior-alignment pipelines.
+An experimental vision–language model that feeds language-model hidden states back into
+a visual encoder across multiple iterations. The research question is whether this
+feedback improves compositional visual reasoning and provides useful predictions for
+neural and behavioral measurements.
 
-## Layout
+**Status: research prototype.** Model, training, evaluation, and probe code are implemented.
+Synthetic CPU checks exercise the implementation. This repository does **not** report
+completed confirmatory training, benchmark improvements, or established brain alignment.
 
-```
-SPEC_v1.md              # research plan
-PREREGISTRATION.md      # H1-H5 locked before Stage-2 training
-model/
-  top_down_adapter.py   # cross-attention adapter, zero-init gated output
-  memory.py             # persistent context tokens (read/write across iterations)
-  encoder.py            # ConvNeXt-V2 wrapper with stage-level access + forward_from
-  llm.py                # LLM wrapper (inputs_embeds composition) + apply_lora
-  connector.py          # MLP connector (CNN tokens -> LLM dim)
-  recurrent_vlm.py      # K-iteration orchestrator + control toggles for C1-C9
-data/
-  conversation.py       # LLaVA-style schema + JSON-backed Dataset
-  transforms.py         # ImageNet-normalized image transforms
-  collator.py           # tokenization + supervision masking + padding
-  decontaminate.py      # PHash decontamination (CLI + library)
-training/
-  trainer.py            # Accelerate-based loop with param-group LR split
-  scheduler.py          # cosine-with-warmup
-  checkpoint.py         # selective save: trainable params only (~50 MB vs ~14 GB)
-evaluation/
-  scoring.py            # Scorer (log-likelihood of continuation under image+prompt)
-  benchmarks.py         # Winoground + BinaryDiscrimination (SugarCrepe/ARO format)
-  k_sweep.py            # vary K at inference; produces per-K accuracy curves
-  iteration_kl.py       # KL(iter1 || iter2) — the H5 iterations-to-converge metric
-  specificity_suite.py  # cross-control driver (main vs C1-C9) + contrast table
-  probes/
-    biased_competition.py  # SPEC §5.B.6: target vs distractor region modulation
-    modulation_analyzer.py # per-image modulation magnitude, difficulty correlation
-    token_decoder.py       # linear probe on persistent context tokens
-  loaders/
-    winoground.py          # HF facebook/winoground -> our JSON manifest format
-    sugarcrepe.py          # HF SugarCrepe + local COCO val2017 -> our format
-analysis/
-  variance_partition.py # NSD per-iteration unique-variance (Lescroart 2015)
-  temporal_generalization.py  # THINGS-MEG decoding (King & Dehaene 2014)
-  rt_correlation.py     # image-averaged, partialed, noise-ceiling RT correlation
-configs/
-  main_dev.yaml         # tier-0: Qwen2.5-0.5B (engineering / debug only)
-  main.yaml             # tier-1: Qwen2.5-1.5B (default; controls C1-C9, H2-H5)
-  main_pub.yaml         # tier-2: Qwen2.5-7B  (publication; main + C1 + C2, H1)
-  controls.yaml         # specificity suite C1-C9 (deltas)
-scripts/
-  setup_env.sh          # one-shot env install (idempotent)
-  build_main.py         # build_main_model() + smoke test (--smoke)
-  test_data_pipeline.py # end-to-end data pipeline smoke test
-  train.py              # training entry (single-GPU or accelerate launch)
-  test_training.py      # 10-step training smoke test
-  test_eval.py          # eval harness smoke test (Winoground + SugarCrepe + K-sweep)
-  verify_real_assembly.py  # real-weight + dtype/device check
+[Run the CPU checks](#quick-start-no-model-downloads) · [Architecture](#architecture) ·
+[Research status](docs/RESEARCH_STATUS.md) · [Training](docs/USAGE.md) · [Data setup](docs/dataset_access.md)
+
+## What is implemented
+
+- **Language-conditioned feedback:** cross-attention adapters with zero-initialized output
+  gates inject language context into intermediate ConvNeXt-V2 stages.
+- **Recurrent computation:** repeated visual/linguistic processing with persistent context
+  tokens and explicit control variants for recurrence, memory, and language feedback.
+- **Training support:** parameter-group learning rates, LoRA integration, Accelerate,
+  selective checkpoints, and gradient/gate diagnostics.
+- **Evaluation:** Winoground and binary-discrimination interfaces, iteration sweeps,
+  mechanism probes, and neural/behavioral analysis modules.
+
+This repository's contribution is the recurrent integration and its experimental tools.
+ConvNeXt-V2, Qwen2.5, LoRA/PEFT, and the datasets are external work; their models and data
+are obtained separately and retain their original attribution and terms.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    I[Image] --> V[ConvNeXt-V2 visual stages]
+    V --> C[Visual-to-language connector]
+    T[Text prompt] --> L[Qwen language model]
+    C --> L
+    L --> O[Token predictions]
+    L --> A[Language-conditioned adapters]
+    M[Persistent context tokens] <--> A
+    A -->|Next iteration| V
 ```
 
-## Status
+At initialization, zero-valued adapter gates should make the recurrent path agree with
+its single-pass control. The synthetic checks test that property and check that gates
+receive gradients. These are implementation checks, not evidence that recurrence improves
+a trained model.
 
-Skeleton complete. End-to-end forward + backward verified on CPU via
-`scripts/build_main.py --smoke` using ConvNeXt-V2-atto + a 4-layer Qwen2 LM
-constructed from config (no weight downloads).
+## Quick start: no model downloads
 
-Verified properties:
-- Zero-init equivalence: at initialization, K=2 forward exactly equals K=1
-  forward (max |Δlogits| = 0). The model degrades gracefully into a vanilla
-  VLM if recurrence training fails.
-- Gradient unlocking: at step 0 only the adapter gate has nonzero gradient
-  (tanh(0)=0 blocks modulation, but out_proj is normally initialized so the
-  gate's own gradient is nonzero). At step 1, gate ≈ 1e-3, and `out_proj`,
-  `q_proj`, and the memory bank all unlock with nonzero gradients.
-- Encoder re-forwarding: when the top-down adapter modulates a non-final
-  CNN stage, modulations propagate through subsequent stages via
-  `ConvNeXtV2Encoder.forward_from()` so the LLM sees the downstream effect.
-
-Not yet built: real-weight loading (Qwen2.5-7B + ConvNeXt-V2-Base on a GPU
-node), mechanism probes (§5.B.6 of `SPEC_v1.md`).
-
-## Smoke tests
+Use Python 3.11 or 3.12 on Linux or macOS. The small model uses random weights and
+synthetic images/text. No GPU, API key, benchmark access, or pretrained weights are needed.
 
 ```bash
-conda activate vlm_custom
-python scripts/build_main.py --smoke           # model wiring + zero-init guarantee
-python scripts/test_data_pipeline.py           # data layer + decontamination + e2e
-python scripts/test_training.py                # 10-step training loop on synthetic data
-python scripts/test_eval.py                    # eval harness + K-sweep on synthetic data
-python scripts/test_specificity_suite.py       # cross-control driver + iteration-KL metric
-python scripts/test_probes.py                  # §5.B.6 mechanism probes (biased-competition, modulation, token decoder)
-python scripts/test_loaders.py                 # HF row -> manifest transformers (Winoground + SugarCrepe)
-python scripts/verify_real_assembly.py         # real Qwen2.5 + ConvNeXt weights (CPU fp32)
+git clone https://github.com/rbybryan/neural-VLM.git
+cd neural-VLM
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-smoke.txt
+python scripts/run_cpu_smoke.py
 ```
 
-All five should end with `PASSED`.
+The runner executes seven checks and stops on any failure. It sets CPU/offline modes,
+uses temporary synthetic data, and prints a final success summary. Depending on the
+machine, allow several minutes after dependency installation.
 
-## Training (single GPU)
+| Check | What it exercises |
+|---|---|
+| `build_main.py --smoke` | Forward/backward pass and zero-init single-pass equivalence |
+| `test_data_pipeline.py` | Synthetic conversations, batching, and decontamination |
+| `test_training.py` | Ten optimizer steps, gate updates, and checkpoint creation |
+| `test_eval.py` | Scoring and benchmark interfaces on synthetic examples |
+| `test_specificity_suite.py` | Control variants and iteration metrics |
+| `test_probes.py` | Mechanism-probe null behavior at initialization |
+| `test_loaders.py` | Dataset-shaped rows converted into evaluation manifests |
 
-Three tiers — see `docs/tier_transition_checklist.md` for the dev->pub
-transition protocol.
+For a shorter first check, run `python scripts/build_main.py --smoke`.
+`verify_real_assembly.py` is separate: it downloads real weights and is not part of the
+offline suite. Do not run it expecting the same resource requirements.
 
-```bash
-conda activate vlm_custom
+## Research protocol and evidence
 
-# tier-0 (Qwen2.5-0.5B): engineering / debug only
-python scripts/train.py --config configs/main_dev.yaml \
-    --tokenizer Qwen/Qwen2.5-0.5B-Instruct ...
+The [research specification](SPEC_v1.md), [in-repository hypothesis plan](PREREGISTRATION.md),
+and [dated amendment](docs/preregistration_amendment_01.md) describe intended experiments.
+They are plans, not completed results or evidence of external preregistration.
+The H3 implementation follows the amendment from THINGS-MEG to THINGS-EEG2.
 
-# tier-1 (Qwen2.5-1.5B): default; all C1-C9 controls + H2/H3/H4/H5 numbers
-python scripts/train.py --config configs/main.yaml \
-    --tokenizer Qwen/Qwen2.5-1.5B-Instruct ...
+See [research status and limitations](docs/RESEARCH_STATUS.md) for what remains untested.
+No sample output from the synthetic suite should be described as benchmark accuracy.
 
-# tier-2 (Qwen2.5-7B): publication-tier; main + C1 + C2 + H1 Winoground
-python scripts/train.py --config configs/main_pub.yaml \
-    --tokenizer Qwen/Qwen2.5-7B-Instruct ...
-```
+## Real training and evaluation
 
-Full flag set:
+The historical GPU setup is `bash scripts/setup_env.sh` (Linux, Conda, CUDA 12.1).
+It is distinct from the CPU smoke environment. `requirements.lock.txt` is a historical
+machine snapshot, not the portable CPU recipe.
 
-```bash
-python scripts/train.py \
-    --config configs/main.yaml \
-    --data-json /path/to/llava_train.json \
-    --image-root /path/to/llava_images \
-    --tokenizer Qwen/Qwen2.5-1.5B-Instruct \
-    --decontamination-tsv excluded.tsv \
-    --output-dir outputs/main_K2 \
-    --max-steps 50000 --batch-size 4 --learning-rate 1e-4
-```
+Follow [training and evaluation](docs/USAGE.md) and [dataset setup](docs/dataset_access.md).
+Set `NEURAL_VLM_DATA_ROOT` or individual dataset variables for your machine; no lab-specific
+mount is required. The [SLURM template](scripts/slurm_train_tier1.sh) takes data, environment,
+and cluster options explicitly.
 
-## Training (multi-GPU)
+## Repository guide
 
-```bash
-accelerate config   # one-time, configure FSDP / DeepSpeed
-accelerate launch scripts/train.py [same flags]
-```
+| Path | Purpose |
+|---|---|
+| `model/` | Visual encoder, language wrapper, connector, adapters, memory, recurrence |
+| `data/` | Conversation schema, transforms, collator, perceptual-hash filtering |
+| `training/` | Training loop, scheduling, checkpoint utilities |
+| `evaluation/` | Benchmark interfaces, controls, probes, dataset converters |
+| `analysis/` | Neural/behavioral analyses and configurable data paths |
+| `configs/` | Development, default, larger-model, and control configurations |
+| `scripts/` | Construction, training, preparation, and runnable smoke checks |
 
-Each control model uses the same script with `--control C1` etc.
+## License and attribution
 
-## Preparing eval benchmarks (production)
+Original code in this repository is available under the [MIT license](LICENSE).
+External libraries, model weights, and datasets retain their own licenses and access
+conditions. Obtain restricted datasets directly from their providers; do not commit
+credentials, subject data, or downloaded weights.
 
-```bash
-# Winoground: gated on HF — accept terms at
-# https://huggingface.co/datasets/facebook/winoground and supply a token
-HF_TOKEN=hf_xxx python scripts/prepare_eval_data.py winoground \
-    --output-dir data/eval/winoground
+For reuse, cite this repository and the exact commit, and cite the original methods and
+datasets described in the research specification. No publication or DOI is claimed here.
 
-# SugarCrepe: requires MS-COCO val2017 downloaded separately
-# (~1 GB from http://images.cocodataset.org/zips/val2017.zip)
-python scripts/prepare_eval_data.py sugarcrepe \
-    --coco-val-dir /path/to/coco/val2017 \
-    --output-dir data/eval/sugarcrepe
-```
-
-Each emits a JSON manifest in the shape consumed by
-`evaluation.benchmarks.{Winoground, BinaryDiscrimination}`.
-
-## Decontamination workflow (production)
-
-```bash
-# Once: index every eval image (Winoground, SugarCrepe, NSD, MMBench, ...)
-python -m data.decontaminate build-index \
-    --eval-dirs /path/to/eval1 /path/to/eval2 \
-    --output decontamination_index.json
-
-# Per training corpus: filter
-ls /path/to/train_images/*.jpg > train_list.txt
-python -m data.decontaminate filter \
-    --train-list train_list.txt \
-    --index decontamination_index.json \
-    --output excluded.tsv
-
-# In code:
-from data import ConversationDataset, load_excluded_set
-dataset = ConversationDataset(
-    json_path="train.json",
-    image_root="/path/to/train_images",
-    image_transform=build_train_transform(224),
-    excluded_image_paths=load_excluded_set("excluded.tsv"),
-)
-```
+[Release-preparation scope and publication notes](docs/RELEASE_PREPARATION.md).

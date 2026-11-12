@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this code, cite this repository and its commit, along with the original methods and datasets."
+type: software
+title: "neural-VLM: language-conditioned recurrent vision"
+authors:
+  - family-names: Rong
+    given-names: Boyan
+repository-code: "https://github.com/rbybryan/neural-VLM"
+license: MIT

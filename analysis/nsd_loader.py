@@ -1,6 +1,6 @@
 """NSD data loader utilities for H2 (variance partition) and H4 (caption specificity).
 
-Layout assumed (all available at /scratch/ccn_datasets/natural-scenes-dataset):
+Layout assumed (under the configured NSD_ROOT):
 
   nsddata_betas/ppdata/subjXX/func1pt8mm/betas_fithrf_GLMdenoise_RR/
       betas_session01.hdf5 ... betas_session40.hdf5

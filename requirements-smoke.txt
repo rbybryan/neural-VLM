@@ -1,0 +1,14 @@
+# CPU smoke suite, tested separately from the CUDA training environment.
+# Python 3.11–3.12. No model weights or benchmark downloads are needed.
+torch==2.5.1
+torchvision==0.20.1
+transformers==4.49.0
+timm==1.0.11
+peft==0.13.2
+accelerate==1.1.1
+numpy==1.26.4
+omegaconf==2.3.0
+imagededup==0.3.3.post2
+datasets==3.1.0
+einops==0.8.0
+scikit-learn==1.6.1
