@@ -1,35 +1,35 @@
 #!/bin/bash
 #SBATCH --job-name=vlm_tier1
-#SBATCH --partition=agcichy
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --gres=gpu:a5000:1
+#SBATCH --gres=gpu:1
 #SBATCH --time=72:00:00
-#SBATCH --qos=standard
-#SBATCH --output=outputs/tier1/slurm_%j.log
-#SBATCH --error=outputs/tier1/slurm_%j.err
+#SBATCH --output=slurm_%j.log
+#SBATCH --error=slurm_%j.err
+
+# Submit from the repository root with the environment already activated:
+# IMAGE_ROOT=/path/to/coco/train2017 DATA_JSON=/path/to/train.json \
+#   sbatch --partition=YOUR_PARTITION scripts/slurm_train_tier1.sh
+# Pass any site-specific GPU type, account, QoS, or time limit to sbatch.
 
 set -euo pipefail
 
-PROJECT_DIR="/home/byrong/projects/VLM-custom"
-CONDA_ENV="vlm_custom"
-TOKENIZER="Qwen/Qwen2.5-1.5B-Instruct"
+PROJECT_DIR="${PROJECT_DIR:-${SLURM_SUBMIT_DIR:-$PWD}}"
+TOKENIZER="${TOKENIZER:-Qwen/Qwen2.5-1.5B-Instruct}"
 
-DATA_JSON="${PROJECT_DIR}/data/train/llava_instruct_150k.json"
-IMAGE_ROOT="/scratch/ccn_datasets/ms_coco/train2017"
-OUTPUT_DIR="${PROJECT_DIR}/outputs/tier1"
+DATA_JSON="${DATA_JSON:?Set DATA_JSON to the training manifest}"
+IMAGE_ROOT="${IMAGE_ROOT:?Set IMAGE_ROOT to the training image directory}"
+OUTPUT_DIR="${OUTPUT_DIR:-${PROJECT_DIR}/outputs/tier1}"
 
 mkdir -p "${OUTPUT_DIR}"
 cd "${PROJECT_DIR}"
 
-source /trinity/shared/easybuild/software/Anaconda3/2024.06-1/bin/activate
-conda activate "${CONDA_ENV}"
 export PYTHONNOUSERSITE=1
 
-# HF cache on scratch to avoid filling home quota
-export HF_HOME="/scratch/ccn_datasets/.hf_cache_${USER}"
+# Override HF_HOME for scratch storage if needed.
+export HF_HOME="${HF_HOME:-${XDG_CACHE_HOME:-$HOME/.cache}/huggingface}"
 mkdir -p "${HF_HOME}"
 
 echo "=== VLM tier-1 training ==="

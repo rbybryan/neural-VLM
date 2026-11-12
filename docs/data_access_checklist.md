@@ -1,5 +1,7 @@
 # Data access checklist
 
+> Historical planning checklist. Current portable paths and the H3 THINGS-EEG2 amendment are described in [dataset setup](dataset_access.md). Confirm current access conditions with each provider.
+
 Datasets the H1–H5 pipeline depends on, ordered by access lead time and
 criticality. Request gated access early — some applications take weeks.
 
@@ -145,4 +147,4 @@ stimuli. Two paths:
 | Model checkpoints (trainable-only, ~10 controls × ~5 ckpts) | ~5 GB |
 | **Total realistic working set** | **~600 GB** |
 
-Cluster home has 8.5 TB free, so storage is not a constraint.
+Storage must be provisioned on the machine used for the experiment.

@@ -1,114 +1,62 @@
-# Dataset Access and Local Paths
+# Dataset setup and portable paths
 
-All datasets that can be pre-staged are available at `/scratch/ccn_datasets`.
-Status column reflects current state on this cluster.
+The repository contains code, not benchmark datasets or trained model weights.
+Obtain each dataset from its provider under its current access conditions.
+The synthetic CPU suite needs none of these datasets.
 
----
+## Data root
 
-## A. Benchmark evaluation datasets
-
-### A1. Winoground  — **ACTION REQUIRED**
-- **Status:** Not yet downloaded. Gated HuggingFace dataset.
-- **Access:** Accept terms at https://huggingface.co/datasets/facebook/winoground
-  (free HF account). Generate a token at https://huggingface.co/settings/tokens.
-  ```bash
-  export HF_TOKEN=hf_...
-  python scripts/prepare_eval_data.py winoground \
-      --output-dir data/eval/winoground
-  ```
-- **Local path (after download):** `data/eval/winoground/` (gitignored).
-- **Required for:** H1.
-
-### A2. SugarCrepe  — **COCO images available; metadata download needed**
-- **Status:** MS-COCO val2017 images are at `/scratch/ccn_datasets/ms_coco/val2017/`
-  (5000 images). The SugarCrepe HF metadata still needs to be downloaded.
-  ```bash
-  python scripts/prepare_eval_data.py sugarcrepe \
-      --coco-val-dir /scratch/ccn_datasets/ms_coco/val2017 \
-      --output-dir data/eval/sugarcrepe
-  ```
-  No HF token needed (public repo: `HuggingFaceM4/SugarCrepe`).
-- **Local path (after download):** manifest in `data/eval/sugarcrepe/`;
-  `image_root` = `/scratch/ccn_datasets/ms_coco/val2017`.
-- **Required for:** H1.
-
-### A3. ARO (Attribution, Relation, Order)  — **ACTION REQUIRED**
-- **Status:** Not downloaded.
-- **Access:** Clone https://github.com/mertyg/vision-language-models-are-bows
-  and follow the data prep instructions (VG relation/attribute JSON + Flickr30k/COCO images).
-- **Set env var:** `export ARO_ROOT=/path/to/aro`
-- **Required for:** H1.
-
----
-
-## B. Neural alignment datasets
-
-### B1. NSD (Natural Scenes Dataset)  — **AVAILABLE**
-- **Status:** Fully available at `/scratch/ccn_datasets/natural-scenes-dataset`.
-- **All 8 subjects present.** Betas (HDF5 + NIfTI), ROI masks, stimuli, experiment metadata.
-- **Key paths** (also in `analysis/paths.py`):
-
-  | Resource | Path |
-  |----------|------|
-  | Beta HDF5 | `…/nsddata_betas/ppdata/subjXX/func1pt8mm/betas_fithrf_GLMdenoise_RR/betas_sessionNN.hdf5` |
-  | pRF ROI masks | `…/nsddata/ppdata/subjXX/func1pt8mm/roi/lh.prf-visualrois.nii.gz` |
-  | floc ROI masks | `…/nsddata/ppdata/subjXX/func1pt8mm/roi/lh.floc-{faces,places,bodies}.nii.gz` |
-  | Stim info CSV | `…/nsddata/experiments/nsd/nsd_stim_info_merged.csv` |
-  | Stimuli HDF5 | `…/nsddata_stimuli/stimuli/nsd/nsd_stimuli.hdf5` |
-
-- **Loaders:** `analysis/nsd_loader.py` — `load_early_visual_mask()`,
-  `load_late_ventral_mask()`, `load_betas_for_subject()`, `load_repeats_for_subject()`.
-- **Required for:** H2, H4.
-
-### B2. THINGS-EEG2 *(amended from THINGS-MEG — see Amendment 01)*  — **AVAILABLE**
-- **Status:** Available at `/scratch/ccn_datasets/things_eeg_2`.
-- **10 subjects.** Test: (200 images, 80 repeats, 17 channels, 100 times @ 10 ms/bin,
-  −200 ms to +790 ms). Train: (16540 images, 4 repeats, …).
-- **Loaders:** `analysis/things_eeg2_loader.py` — `eeg_for_temporal_generalization()`.
-- **Amendment:** Pre-registration H3 originally specified THINGS-MEG.
-  See `docs/preregistration_amendment_01.md` for full justification.
-- **Required for:** H3.
-
-### B3. MS-COCO (training images for NSD cross-reference)  — **AVAILABLE**
-- **Path:** `/scratch/ccn_datasets/ms_coco/val2017` (5000 images).
-- `nsd_stim_info_merged.csv` links NSD stimuli to COCO IDs.
-
----
-
-## C. Training data
-
-### C1. LLaVA-665k instruction-tuning corpus  — **ACTION REQUIRED**
-- **Status:** Not downloaded.
-- **Access:** Follow the LLaVA-v1.5 data preparation script at
-  https://github.com/haotian-liu/LLaVA/blob/main/docs/Data.md
-- Pass paths via `--data-json` and `--image-root` flags to `scripts/train.py`.
-- COCO train2017 images (required by LLaVA) are not yet confirmed on this cluster.
-
----
-
-## D. Status summary
-
-| Dataset | Scratch location | Status | Action needed |
-|---------|-----------------|--------|---------------|
-| NSD | `/scratch/ccn_datasets/natural-scenes-dataset` | ✅ Available | None |
-| THINGS-EEG2 | `/scratch/ccn_datasets/things_eeg_2` | ✅ Available | None |
-| MS-COCO val2017 | `/scratch/ccn_datasets/ms_coco/val2017` | ✅ Available | None |
-| Winoground | — | ❌ Gated HF | Accept terms + `prepare_eval_data.py winoground` |
-| SugarCrepe metadata | — | ⚠️ Partial | `prepare_eval_data.py sugarcrepe` (COCO images present) |
-| ARO | — | ❌ Not downloaded | Clone ARO repo + download VG/Flickr data |
-| LLaVA-665k | — | ❌ Not downloaded | Follow LLaVA data prep |
-
----
-
-## E. Environment variables
+Set `NEURAL_VLM_DATA_ROOT` to a directory you control. If unset, paths are relative to
+`datasets/` under the working directory. Individual overrides take precedence:
 
 ```bash
-# Override default scratch paths if needed (defaults already point to scratch):
-export NSD_ROOT=/scratch/ccn_datasets/natural-scenes-dataset
-export THINGS_EEG2_ROOT=/scratch/ccn_datasets/things_eeg_2
-
-# Required for gated HF datasets:
-export HF_TOKEN=hf_...
+export NEURAL_VLM_DATA_ROOT=/path/to/datasets
+export NSD_ROOT="$NEURAL_VLM_DATA_ROOT/natural-scenes-dataset"
+export THINGS_EEG2_ROOT="$NEURAL_VLM_DATA_ROOT/things_eeg_2"
+export COCO_VAL2017="$NEURAL_VLM_DATA_ROOT/ms_coco/val2017"
 ```
 
-All path constants are centralized in `analysis/paths.py`.
+See `analysis/paths.py` for the exact layouts. `COCO_TRAIN2017`, `THINGS_DB_ROOT`, and
+`ARO_ROOT` are also configurable. Local dataset directories are gitignored.
+
+## Benchmark inputs
+
+| Dataset | Provider / instructions | Entry point |
+|---|---|---|
+| Winoground | [Hugging Face](https://huggingface.co/datasets/facebook/winoground); complete any access requirements | `scripts/prepare_eval_data.py winoground` |
+| SugarCrepe | [Official repository](https://github.com/RAIVNLab/sugar-crepe); requires matching COCO images | `scripts/prepare_eval_data.py sugarcrepe` |
+| NSD | [Natural Scenes Dataset](https://naturalscenesdataset.org/) | `analysis/nsd_loader.py` |
+| THINGS-EEG2 | [Dataset](https://osf.io/3jk45/) | `analysis/things_eeg2_loader.py` |
+| ARO | [Official repository](https://github.com/mertyg/vision-language-models-are-bows) | External preparation; no dedicated loader supplied |
+
+For Winoground, authenticate locally if required, then run:
+
+```bash
+python scripts/prepare_eval_data.py winoground --output-dir data/eval/winoground
+python scripts/prepare_eval_data.py sugarcrepe \
+    --coco-val-dir "$COCO_VAL2017" --output-dir data/eval/sugarcrepe
+```
+
+Keep access tokens in your local credential store or environment. Never paste them into
+code, logs, documentation, or committed configuration.
+
+## Neural analyses
+
+NSD expects `nsddata/`, `nsddata_betas/`, and `nsddata_stimuli/` under `NSD_ROOT`.
+THINGS-EEG2 expects `preprocessed_data/` and `image_set/` under `THINGS_EEG2_ROOT`.
+The original H3 plan named THINGS-MEG; the implementation follows the documented
+[THINGS-EEG2 amendment](preregistration_amendment_01.md).
+
+The historical [access checklist](data_access_checklist.md) records the broader research
+plan. Its storage estimates and access assumptions are not guarantees of current availability.
+
+## Training inputs
+
+Prepare an image/conversation corpus in the schema accepted by `data/conversation.py`.
+Pass its manifest and image directory via `--data-json` and `--image-root`.
+Follow the original provider's preparation instructions; see
+[LLaVA data preparation](https://github.com/haotian-liu/LLaVA/blob/main/docs/Data.md).
+Use `data/decontaminate.py` to filter training images against evaluation inputs before
+reporting benchmark results. See [training usage](USAGE.md).
+
+No script assumes the author's cluster, storage quota, or login name.

@@ -46,3 +46,19 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+
+# Local environments, credentials, and private operational notes
+.venv/
+venv/
+.pytest_cache/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+notes/live/
+
+# Downloaded datasets and scheduler output
+datasets/
+slurm_*.log
+slurm_*.err

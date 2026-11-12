@@ -1,4 +1,4 @@
-"""Canonical scratch paths for all datasets used in H1-H5 analyses.
+"""Configurable paths for all datasets used in H1-H5 analyses.
 
 Override any path via environment variable (see each constant's comment).
 """
@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-_SCRATCH = Path("/scratch/ccn_datasets")
+_SCRATCH = Path(os.environ.get("NEURAL_VLM_DATA_ROOT", "datasets")).expanduser()
 
 # -------------------------------------------------------------------
 # NSD  (H2, H4)
@@ -36,13 +36,13 @@ NSD_ROI_FILES = {
 # -------------------------------------------------------------------
 # MS-COCO  (SugarCrepe eval, NSD stimuli cross-reference)
 # -------------------------------------------------------------------
-COCO_VAL2017  = _SCRATCH / "ms_coco" / "val2017"
-COCO_TRAIN2017 = _SCRATCH / "ms_coco" / "train2017"
+COCO_VAL2017 = Path(os.environ.get("COCO_VAL2017", _SCRATCH / "ms_coco" / "val2017"))
+COCO_TRAIN2017 = Path(os.environ.get("COCO_TRAIN2017", _SCRATCH / "ms_coco" / "train2017"))
 
 # -------------------------------------------------------------------
 # THINGS-EEG2  (H3 — temporal generalization; EEG, 10 subjects)
 # Pre-registration Amendment 01: H3 originally specified THINGS-MEG;
-# THINGS-EEG2 is available on this cluster and covers the same stimuli.
+# The implementation follows the THINGS-EEG2 amendment.
 # See docs/preregistration_amendment_01.md.
 # -------------------------------------------------------------------
 THINGS_EEG2_ROOT = Path(os.environ.get("THINGS_EEG2_ROOT",
@@ -57,7 +57,7 @@ THINGS_EEG2_SUBJECTS     = [f"sub-{i:02d}" for i in range(1, 11)]  # sub-01..sub
 # -------------------------------------------------------------------
 # THINGS image database
 # -------------------------------------------------------------------
-THINGS_DB_ROOT = _SCRATCH / "THINGS-database"
+THINGS_DB_ROOT = Path(os.environ.get("THINGS_DB_ROOT", _SCRATCH / "THINGS-database"))
 
 # -------------------------------------------------------------------
 # Winoground  (H1) — gated HuggingFace dataset

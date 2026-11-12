@@ -1,6 +1,6 @@
 """THINGS-EEG2 loader for H3 temporal generalization analysis.
 
-Dataset available at /scratch/ccn_datasets/things_eeg_2.
+Dataset loaded from the configured THINGS_EEG2_ROOT.
 
 Layout:
   preprocessed_data/sub-XX/
