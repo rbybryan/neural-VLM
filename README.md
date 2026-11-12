@@ -1,55 +1,45 @@
-# neural-VLM: language-conditioned recurrent vision
+# neural-VLM
 
-An experimental vision–language model that feeds language-model hidden states back into
-a visual encoder across multiple iterations. The research question is whether this
-feedback improves compositional visual reasoning and provides useful predictions for
-neural and behavioral measurements.
+I'm using this project to test whether language feedback can change a visual model's
+representations across repeated passes through an image. The model combines a
+ConvNeXt-V2 encoder with a Qwen language model. Hidden states from the language model
+feed back into the visual encoder through gated adapters.
 
-**Status: research prototype.** Model, training, evaluation, and probe code are implemented.
-Synthetic CPU checks exercise the implementation. This repository does **not** report
-completed confirmatory training, benchmark improvements, or established brain alignment.
+The implementation is running on synthetic examples. I haven't established a
+benchmark gain or a neural-alignment result yet.
 
-[Run the CPU checks](#quick-start-no-model-downloads) · [Architecture](#architecture) ·
-[Research status](docs/RESEARCH_STATUS.md) · [Training](docs/USAGE.md) · [Data setup](docs/dataset_access.md)
+## What I'm building
 
-## What is implemented
+My main addition is the recurrent connection between the visual and language models.
+The adapters act on intermediate visual stages, and a small bank of context tokens
+carries state between iterations. I start the adapter gates at zero so I can check
+that the recurrent model initially agrees with its single-pass control.
 
-- **Language-conditioned feedback:** cross-attention adapters with zero-initialized output
-  gates inject language context into intermediate ConvNeXt-V2 stages.
-- **Recurrent computation:** repeated visual/linguistic processing with persistent context
-  tokens and explicit control variants for recurrence, memory, and language feedback.
-- **Training support:** parameter-group learning rates, LoRA integration, Accelerate,
-  selective checkpoints, and gradient/gate diagnostics.
-- **Evaluation:** Winoground and binary-discrimination interfaces, iteration sweeps,
-  mechanism probes, and neural/behavioral analysis modules.
-
-This repository's contribution is the recurrent integration and its experimental tools.
-ConvNeXt-V2, Qwen2.5, LoRA/PEFT, and the datasets are external work; their models and data
-are obtained separately and retain their original attribution and terms.
-
-## Architecture
+The code also includes control variants that remove recurrence, language feedback,
+or memory. Those comparisons matter for the question I'm asking: if repeated passes
+help, which part of the feedback loop is responsible?
 
 ```mermaid
 flowchart LR
-    I[Image] --> V[ConvNeXt-V2 visual stages]
-    V --> C[Visual-to-language connector]
-    T[Text prompt] --> L[Qwen language model]
+    I[Image] --> V[ConvNeXt-V2]
+    V --> C[Connector]
+    T[Text prompt] --> L[Qwen]
     C --> L
     L --> O[Token predictions]
-    L --> A[Language-conditioned adapters]
-    M[Persistent context tokens] <--> A
-    A -->|Next iteration| V
+    L --> A[Gated adapters]
+    M[Context tokens] <--> A
+    A -->|Next pass| V
 ```
 
-At initialization, zero-valued adapter gates should make the recurrent path agree with
-its single-pass control. The synthetic checks test that property and check that gates
-receive gradients. These are implementation checks, not evidence that recurrence improves
-a trained model.
+Start with [the recurrent model](model/recurrent_vlm.py),
+[adapters](model/top_down_adapter.py), and [control configs](configs/controls.yaml).
+The training code supports separate learning rates for the feedback parameters,
+LoRA, and checkpoints containing only trainable parameters.
 
-## Quick start: no model downloads
+## Try it on a CPU
 
-Use Python 3.11 or 3.12 on Linux or macOS. The small model uses random weights and
-synthetic images/text. No GPU, API key, benchmark access, or pretrained weights are needed.
+Use Python 3.11 or 3.12 on Linux or macOS. This runs a small, randomly initialized
+model with synthetic images and text; no GPU or model download is needed.
 
 ```bash
 git clone https://github.com/rbybryan/neural-VLM.git
@@ -60,65 +50,39 @@ python -m pip install -r requirements-smoke.txt
 python scripts/run_cpu_smoke.py
 ```
 
-The runner executes seven checks and stops on any failure. It sets CPU/offline modes,
-uses temporary synthetic data, and prints a final success summary. Depending on the
-machine, allow several minutes after dependency installation.
+The seven checks cover model construction, data loading, ten training steps,
+evaluation, control variants, probes, and dataset converters. They check that the
+pieces work together; the printed scores are from synthetic data.
 
-| Check | What it exercises |
-|---|---|
-| `build_main.py --smoke` | Forward/backward pass and zero-init single-pass equivalence |
-| `test_data_pipeline.py` | Synthetic conversations, batching, and decontamination |
-| `test_training.py` | Ten optimizer steps, gate updates, and checkpoint creation |
-| `test_eval.py` | Scoring and benchmark interfaces on synthetic examples |
-| `test_specificity_suite.py` | Control variants and iteration metrics |
-| `test_probes.py` | Mechanism-probe null behavior at initialization |
-| `test_loaders.py` | Dataset-shaped rows converted into evaluation manifests |
+For a shorter first run:
 
-For a shorter first check, run `python scripts/build_main.py --smoke`.
-`verify_real_assembly.py` is separate: it downloads real weights and is not part of the
-offline suite. Do not run it expecting the same resource requirements.
+```bash
+python scripts/build_main.py --smoke
+```
 
-## Research protocol and evidence
+`verify_real_assembly.py` is a separate check that downloads real weights.
 
-The [research specification](SPEC_v1.md), [in-repository hypothesis plan](PREREGISTRATION.md),
-and [dated amendment](docs/preregistration_amendment_01.md) describe intended experiments.
-They are plans, not completed results or evidence of external preregistration.
-The H3 implementation follows the amendment from THINGS-MEG to THINGS-EEG2.
+## Experiments
 
-See [research status and limitations](docs/RESEARCH_STATUS.md) for what remains untested.
-No sample output from the synthetic suite should be described as benchmark accuracy.
+The evaluation code includes Winoground and SugarCrepe-style comparisons, iteration
+sweeps, and probes of visual modulation and context-token content. I also have
+analysis modules for neural representations and reaction times. These still need
+validation with real data; the [current status](docs/RESEARCH_STATUS.md) lists the
+next steps.
 
-## Real training and evaluation
+The [research plan](SPEC_v1.md) and [hypotheses](PREREGISTRATION.md) record the intended
+comparisons. H3 now uses THINGS-EEG2 following this
+[amendment](docs/preregistration_amendment_01.md).
 
-The historical GPU setup is `bash scripts/setup_env.sh` (Linux, Conda, CUDA 12.1).
-It is distinct from the CPU smoke environment. `requirements.lock.txt` is a historical
-machine snapshot, not the portable CPU recipe.
+For GPU work, use `bash scripts/setup_env.sh` on Linux with Conda and CUDA 12.1,
+then follow the [training guide](docs/USAGE.md) and [data setup](docs/dataset_access.md).
+Set `NEURAL_VLM_DATA_ROOT` to your dataset directory. The CPU requirements are separate
+from that training environment.
 
-Follow [training and evaluation](docs/USAGE.md) and [dataset setup](docs/dataset_access.md).
-Set `NEURAL_VLM_DATA_ROOT` or individual dataset variables for your machine; no lab-specific
-mount is required. The [SLURM template](scripts/slurm_train_tier1.sh) takes data, environment,
-and cluster options explicitly.
+## Built on
 
-## Repository guide
-
-| Path | Purpose |
-|---|---|
-| `model/` | Visual encoder, language wrapper, connector, adapters, memory, recurrence |
-| `data/` | Conversation schema, transforms, collator, perceptual-hash filtering |
-| `training/` | Training loop, scheduling, checkpoint utilities |
-| `evaluation/` | Benchmark interfaces, controls, probes, dataset converters |
-| `analysis/` | Neural/behavioral analyses and configurable data paths |
-| `configs/` | Development, default, larger-model, and control configurations |
-| `scripts/` | Construction, training, preparation, and runnable smoke checks |
-
-## License and attribution
-
-Original code in this repository is available under the [MIT license](LICENSE).
-External libraries, model weights, and datasets retain their own licenses and access
-conditions. Obtain restricted datasets directly from their providers; do not commit
-credentials, subject data, or downloaded weights.
-
-For reuse, cite this repository and the exact commit, and cite the original methods and
-datasets described in the research specification. No publication or DOI is claimed here.
-
-[Release-preparation scope and publication notes](docs/RELEASE_PREPARATION.md).
+This project uses ConvNeXt-V2, Qwen2.5, PEFT/LoRA, and Accelerate. My work is the
+recurrent integration and the experiments around it. Original code here is
+[MIT licensed](LICENSE); external code, weights, and datasets retain their own terms.
+For reuse, cite the relevant methods and datasets, and include the commit used from
+this repo.
