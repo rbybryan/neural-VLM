@@ -4,28 +4,23 @@ These commands require separately obtained models and datasets. For the download
 
 ## Training (single GPU)
 
-Three tiers — see `docs/tier_transition_checklist.md` for the dev->pub
-transition protocol.
+The available configurations use three language-model sizes:
+
+| Config | Tokenizer/model |
+|---|---|
+| `configs/main_dev.yaml` | `Qwen/Qwen2.5-0.5B-Instruct` |
+| `configs/main.yaml` (default) | `Qwen/Qwen2.5-1.5B-Instruct` |
+| `configs/main_pub.yaml` | `Qwen/Qwen2.5-7B-Instruct` |
+
+The `pub` filename comes from the original plan; no trained 7B results are reported.
+See the [size-transition notes](tier_transition_checklist.md) for the planned checks
+when changing model size. Real-data training still needs validation.
+
+For the default configuration, replace the data paths and provide the exclusion
+list produced by the decontamination step below:
 
 ```bash
 conda activate vlm_custom
-
-# tier-0 (Qwen2.5-0.5B): engineering / debug only
-python scripts/train.py --config configs/main_dev.yaml \
-    --tokenizer Qwen/Qwen2.5-0.5B-Instruct ...
-
-# tier-1 (Qwen2.5-1.5B): default; all C1-C9 controls + H2/H3/H4/H5 numbers
-python scripts/train.py --config configs/main.yaml \
-    --tokenizer Qwen/Qwen2.5-1.5B-Instruct ...
-
-# tier-2 (Qwen2.5-7B): publication-tier; main + C1 + C2 + H1 Winoground
-python scripts/train.py --config configs/main_pub.yaml \
-    --tokenizer Qwen/Qwen2.5-7B-Instruct ...
-```
-
-Full flag set:
-
-```bash
 python scripts/train.py \
     --config configs/main.yaml \
     --data-json /path/to/llava_train.json \
@@ -43,14 +38,17 @@ accelerate config   # one-time, configure FSDP / DeepSpeed
 accelerate launch scripts/train.py --help
 ```
 
-Each control model uses the same script with `--control C1` etc.
+Control overrides take the full key from [controls.yaml](../configs/controls.yaml),
+for example `--control C3_llm_no_recurrence`. The command does not accept the shorthand
+`--control C3`. Read the [known control gaps](RESEARCH_STATUS.md) before interpreting
+any comparison.
 
-## Preparing eval benchmarks (production)
+## Preparing evaluation data
 
 ```bash
 # Winoground: gated on HF — accept terms at
 # https://huggingface.co/datasets/facebook/winoground and supply a token
-HF_TOKEN=hf_xxx python scripts/prepare_eval_data.py winoground \
+python scripts/prepare_eval_data.py winoground \
     --output-dir data/eval/winoground
 
 # SugarCrepe: requires MS-COCO val2017 downloaded separately
@@ -63,7 +61,7 @@ python scripts/prepare_eval_data.py sugarcrepe \
 Each emits a JSON manifest in the shape consumed by
 `evaluation.benchmarks.{Winoground, BinaryDiscrimination}`.
 
-## Decontamination workflow (production)
+## Filtering near-duplicate images
 
 ```bash
 # Once: index every eval image (Winoground, SugarCrepe, NSD, MMBench, ...)
@@ -78,12 +76,17 @@ python -m data.decontaminate filter \
     --index decontamination_index.json \
     --output excluded.tsv
 
-# In code:
-from data import ConversationDataset, load_excluded_set
+```
+
+The same exclusion list can be passed to the dataset directly:
+
+```python
+from pathlib import Path
+from data import ConversationDataset, build_train_transform, load_excluded_set
 dataset = ConversationDataset(
     json_path="train.json",
     image_root="/path/to/train_images",
     image_transform=build_train_transform(224),
-    excluded_image_paths=load_excluded_set("excluded.tsv"),
+    excluded_image_paths=load_excluded_set(Path("excluded.tsv")),
 )
 ```

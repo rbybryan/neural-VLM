@@ -12,12 +12,16 @@ benchmark gain or a neural-alignment result yet.
 
 My main addition is the recurrent connection between the visual and language models.
 The adapters act on intermediate visual stages, and a small bank of context tokens
-carries state between iterations. I start the adapter gates at zero so I can check
-that the recurrent model initially agrees with its single-pass control.
+carries state between iterations. I initialize each adapter gate at zero but leave
+its output projection nonzero. This makes the initial output match the single-pass
+model while allowing the gate to receive a gradient. The [construction check](scripts/build_main.py)
+compares the two outputs, and the [short training check](scripts/test_training.py)
+checks that the gates move away from zero.
 
-The code also includes control variants that remove recurrence, language feedback,
-or memory. Those comparisons matter for the question I'm asking: if repeated passes
-help, which part of the feedback loop is responsible?
+The control settings vary recurrence, the source of feedback, and memory. They are
+intended to answer a separate question: if repeated passes help, which part of the
+loop is responsible? The compute-matched and no-language controls still need work;
+the [implementation notes](docs/RESEARCH_STATUS.md) describe the gaps.
 
 ```mermaid
 flowchart LR
@@ -27,7 +31,8 @@ flowchart LR
     C --> L
     L --> O[Token predictions]
     L --> A[Gated adapters]
-    M[Context tokens] <--> A
+    L --> M[Context tokens]
+    M --> A
     A -->|Next pass| V
 ```
 
@@ -70,8 +75,9 @@ analysis modules for neural representations and reaction times. These still need
 validation with real data; the [current status](docs/RESEARCH_STATUS.md) lists the
 next steps.
 
-The [research plan](SPEC_v1.md) and [hypotheses](PREREGISTRATION.md) record the intended
-comparisons. H3 now uses THINGS-EEG2 following this
+The [design notes](SPEC_v1.md) and [hypotheses](PREREGISTRATION.md) record the intended
+comparisons. The hypotheses have an in-repository tag; no external registration is
+linked. H3 now uses THINGS-EEG2 following this
 [amendment](docs/preregistration_amendment_01.md).
 
 For GPU work, use `bash scripts/setup_env.sh` on Linux with Conda and CUDA 12.1,

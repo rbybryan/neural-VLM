@@ -1,22 +1,20 @@
-# Pre-registration — Language-Conditioned Recurrent VLM
+# Research hypotheses and analysis plan
 
-**Authors.** [Byrong et al.]
-**Date locked.** 2026-05-11
-**Repo lock.** git tag `v0-preregistration` in this repository; the tagged
-commit fixes the analysis code, configs, and this document. For an
-external lock (OSF / Zenodo), push this repo and reference the public
-commit hash at the tag.
+**Author:** Boyan Rong
 
-This document locks the analysis plan for the empirical claims in the paper
-*before any Stage-2 model is trained*. Any deviation from the plan below will
-be flagged explicitly as exploratory in the manuscript.
+**Original plan date:** 2026-05-11
 
-The corresponding spec is `SPEC_v1.md`. The corresponding analysis code is
-`analysis/`.
+**Original snapshot:** git tag `v0-preregistration`
+
+This records the intended comparisons for the recurrent VLM project. The tag preserves the original in-repository plan; no external registration is linked here. These are hypotheses, not completed results.
+
+The original model description below is retained as part of that plan. The current default is a text-only Qwen2.5-1.5B model paired with ConvNeXt-V2, and the control implementations still have gaps. See the [design notes](SPEC_v1.md) and [current status](docs/RESEARCH_STATUS.md) before using the plan as a run specification.
+
+H3 uses THINGS-EEG2 under [Amendment 01](docs/preregistration_amendment_01.md). [Amendment 02](docs/preregistration_amendment_02.md) records the documentation corrections and withdrawal of unsupported power estimates. H1–H5 below retain their original directions and thresholds; their statistical procedures still need validation before confirmatory use.
 
 ---
 
-## 1. Models trained for confirmatory analysis
+## 1. Models proposed for confirmatory analysis
 
 | ID | Description | Source |
 |---|---|---|
@@ -29,9 +27,8 @@ The corresponding spec is `SPEC_v1.md`. The corresponding analysis code is
 Eval-time controls (no separate training): C5 shuffled-caption, C6
 iteration-scrambling, C7 memory-lesion, C8 K-sweep, C9 ensembling baseline.
 
-All models use the *identical* training data, optimizer, schedule, and seed
-budget. Differences are limited to the architectural toggles in
-`RecurrentVLMConfig`.
+The planned comparison uses the same training data, optimizer, schedule, and seed
+budget across models. This has not yet been demonstrated in real-data runs.
 
 ---
 
@@ -134,17 +131,14 @@ single-test.
 
 ## 5. Power and feasibility
 
-- Winoground (n=400 image pairs): paired-bootstrap detects effects ≥ 3% at
-  α=0.01 with >0.8 power.
-- NSD voxel-level paired bootstrap with ~10k voxels per ROI: detects
-  per-voxel mean differences ≥ 0.005 R^2 with negligible variance.
-- THINGS-MEG (n=22k+ images, 4 subjects): time-bin bootstrap detects
-  iteration × window interactions of ≥ 0.01 decoding R^2 at α=0.01.
-- RT correlation: with n ≥ 1000 images and split-half ceiling typically
-  0.7–0.85, partial r ≥ 0.25 is detectable at α=0.05.
+No reproducible power calculation or simulation is included in this repository.
+The numerical power assurances in the original plan are withdrawn from this
+version, as recorded in [Amendment 02](docs/preregistration_amendment_02.md).
 
-If any benchmark falls below the power threshold above, the corresponding
-hypothesis is reported as exploratory.
+Before confirmatory analysis, the sampling units, dependence structure, dataset
+sizes, effect-size assumptions, and multiple-comparison procedure need review.
+The desired effect sizes in the hypotheses are planning thresholds, not measured
+performance or demonstrated detection power.
 
 ---
 
@@ -154,6 +148,7 @@ Any analysis NOT specified in §2 is exploratory and labeled as such in the
 manuscript. If a confirmatory test fails, we report the failure; we do not
 substitute a related test post-hoc and call it confirmatory.
 
-The frozen analysis code, config files, and this document are committed to
-the repository at the hash recorded in §0 above. All confirmatory analyses
-are run from that frozen code.
+The original code and plan are preserved at `v0-preregistration`. No completed
+confirmatory analysis is reported here. Any future analysis must record the code
+commit, data version, and amendments used; the current working tree should not be
+assumed identical to the tagged plan.
